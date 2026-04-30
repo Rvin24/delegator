@@ -11,6 +11,7 @@
  *   pnpm tsx src/inspect.ts
  */
 
+import 'dotenv/config';
 import { createPublicClient, http, formatEther, type Hex } from 'viem';
 import { base } from 'viem/chains';
 

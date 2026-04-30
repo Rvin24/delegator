@@ -44,6 +44,7 @@
  *   pnpm tsx src/delegate.ts
  */
 
+import 'dotenv/config';
 import {
   createPublicClient,
   createWalletClient,
