@@ -169,11 +169,43 @@ async function main(): Promise<void> {
   console.log(`Gas used:           ${receipt.gasUsed}`);
   console.log('');
 
-  const eoaCodeAfter = await publicClient.getCode({ address: compromised.address });
-  console.log('--- Post-state ---');
-  console.log(`EOA code now:       ${describeCode((eoaCodeAfter || '0x') as Hex)}`);
   if (receipt.status !== 'success') {
     throw new Error('Transaction reverted. EOA delegation may not have changed.');
+  }
+
+  /* Public RPCs are usually load-balanced across multiple nodes that may be
+     a block or two behind one another. Reading state at the receipt's exact
+     block number — not at "latest" — guarantees the read is consistent with
+     the block where our authorization was processed. We also retry briefly
+     on the rare case the responder hasn't synced that block yet. */
+  const expectedDelegate = DELEGATE_TARGET.toLowerCase();
+  let eoaCodeAfter: Hex = '0x';
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      eoaCodeAfter = ((await publicClient.getCode({
+        address: compromised.address,
+        blockNumber: receipt.blockNumber,
+      })) || '0x') as Hex;
+      const observed = eoaCodeAfter.toLowerCase();
+      const isClear = expectedDelegate === ('0x' + '00'.repeat(20)) && observed === '0x';
+      const isDelegated = observed === ('0xef0100' + expectedDelegate.slice(2));
+      if (isClear || isDelegated) break;
+    } catch {
+      /* node behind on this block; fall through to retry */
+    }
+    await new Promise((r) => setTimeout(r, 800));
+  }
+
+  console.log('--- Post-state (at receipt block) ---');
+  console.log(`EOA code now:       ${describeCode(eoaCodeAfter)}`);
+
+  /* Also report the latest-tip view, which may differ if anyone (e.g. the
+     drainer) re-delegated in a subsequent block. This is the state that
+     matters for any next action you take. */
+  const eoaCodeLatest = ((await publicClient.getCode({ address: compromised.address })) || '0x') as Hex;
+  if (eoaCodeLatest.toLowerCase() !== eoaCodeAfter.toLowerCase()) {
+    console.log(`EOA code at tip:    ${describeCode(eoaCodeLatest)}`);
+    console.log('Note: state changed after the receipt block. Someone (likely the drainer) re-delegated.');
   }
 }
 
