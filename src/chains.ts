@@ -20,7 +20,6 @@ import {
   mainnet,
   arbitrum,
   optimism,
-  polygon,
   sepolia,
   type Chain,
 } from 'viem/chains';
@@ -44,7 +43,10 @@ const PRESETS: Record<string, ChainProfile> = {
   },
   ethereum: {
     chain: mainnet,
-    rpcUrl: 'https://eth.llamarpc.com',
+    /* publicnode.com Ethereum endpoint — reliable in our tests; the
+       previously-shipped llamarpc default returned upstream-gateway
+       errors. Override with RPC_URL for production-grade reliability. */
+    rpcUrl: 'https://ethereum.publicnode.com',
     explorerTxBase: 'https://etherscan.io/tx/',
     explorerAddressBase: 'https://etherscan.io/address/',
     label: 'Ethereum mainnet',
@@ -62,13 +64,6 @@ const PRESETS: Record<string, ChainProfile> = {
     explorerTxBase: 'https://optimistic.etherscan.io/tx/',
     explorerAddressBase: 'https://optimistic.etherscan.io/address/',
     label: 'OP Mainnet',
-  },
-  polygon: {
-    chain: polygon,
-    rpcUrl: 'https://polygon-rpc.com',
-    explorerTxBase: 'https://polygonscan.com/tx/',
-    explorerAddressBase: 'https://polygonscan.com/address/',
-    label: 'Polygon PoS',
   },
   bsc: {
     chain: bsc,

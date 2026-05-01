@@ -6,7 +6,7 @@
  * delegate.ts to confirm the EOA is in the expected state.
  *
  * Chain selection is identical to delegate.ts:
- *   - CHAIN=base|ethereum|arbitrum|optimism|polygon|bsc|sepolia|base-sepolia
+ *   - CHAIN=base|ethereum|arbitrum|optimism|bsc|ink|sepolia|base-sepolia
  *   - or CHAIN_ID=<num> + RPC_URL=<url> for a custom chain.
  *
  * Usage
