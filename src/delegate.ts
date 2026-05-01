@@ -3,10 +3,14 @@
  *
  * What this does
  * --------------
- * Submits a single type-0x04 (SetCode) transaction on Base mainnet that
- * re-points the compromised EOA's EIP-7702 delegation to `DELEGATE_TARGET`.
- * That is the only side effect on the EOA — no claim, no sweep, no token
+ * Submits a single type-0x04 (SetCode) transaction that re-points the
+ * compromised EOA's EIP-7702 delegation to `DELEGATE_TARGET`. That is
+ * the only side effect on the EOA — no claim, no sweep, no token
  * movement, no contract calls. Just delegation rotation.
+ *
+ * The chain to operate on is selected via env (`CHAIN=base|ethereum|...`
+ * or `CHAIN_ID=...`+`RPC_URL=...`). See src/chains.ts for the full list
+ * of presets and the resolution order.
  *
  * Why this exists
  * ---------------
@@ -15,17 +19,6 @@
  * replaces the attached implementation. EIP-7702 also separates *signer
  * authorization* from *gas payer*, so a clean operator wallet can pay gas
  * while attaching the authorization signed by the compromised key.
- *
- * Use cases
- * ---------
- * 1. Pre-position before a known unlock window (claim portal etc.) so that
- *    when the unlock fires, your EOA is already pointing at code you
- *    control instead of the drainer's sweeper.
- * 2. Capture incidental funds that land on the EOA between drainer
- *    re-delegations: while you hold the delegation, anything dropped on the
- *    EOA hits *your* code (e.g. a contract that forwards to a safe wallet).
- * 3. "Clear" the delegation entirely by pointing at the zero address —
- *    EIP-7702 explicitly defines this as removing the attached code.
  *
  * Security
  * --------
@@ -38,9 +31,9 @@
  * Usage
  * -----
  *   COMPROMISED_PK=0x...           # leaked PK
- *   OPERATOR_PK=0x...              # clean wallet, ~$0.10 ETH on Base
+ *   OPERATOR_PK=0x...              # clean wallet with native gas
  *   DELEGATE_TARGET=0x...          # contract to delegate to (or 0x0... to clear)
- *   BASE_RPC_URL=https://...       # optional, defaults to public Base RPC
+ *   CHAIN=base                     # or ethereum, arbitrum, optimism, ...
  *   pnpm tsx src/delegate.ts
  */
 
@@ -54,9 +47,11 @@ import {
   type Hex,
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { base } from 'viem/chains';
+import { resolveChainProfile } from './chains.js';
 
-const BASE_RPC_URL = process.env.BASE_RPC_URL || 'https://mainnet.base.org';
+const chainProfile = resolveChainProfile();
+const { chain, rpcUrl, explorerTxBase, label: chainLabel } = chainProfile;
+const nativeSymbol = chain.nativeCurrency?.symbol || 'ETH';
 const COMPROMISED_PK = (process.env.COMPROMISED_PK || '') as Hex;
 const OPERATOR_PK = (process.env.OPERATOR_PK || '') as Hex;
 const DELEGATE_TARGET = (process.env.DELEGATE_TARGET || '') as Address;
@@ -75,18 +70,18 @@ const compromised = privateKeyToAccount(COMPROMISED_PK);
 const operator = privateKeyToAccount(OPERATOR_PK);
 
 const publicClient = createPublicClient({
-  chain: base,
-  transport: http(BASE_RPC_URL),
+  chain,
+  transport: http(rpcUrl),
 });
 const operatorClient = createWalletClient({
   account: operator,
-  chain: base,
-  transport: http(BASE_RPC_URL),
+  chain,
+  transport: http(rpcUrl),
 });
 const compromisedClient = createWalletClient({
   account: compromised,
-  chain: base,
-  transport: http(BASE_RPC_URL),
+  chain,
+  transport: http(rpcUrl),
 });
 
 function shorten(addr: string): string {
@@ -103,7 +98,8 @@ function describeCode(code: Hex): string {
 
 async function main(): Promise<void> {
   console.log('=== EIP-7702 delegate-only runner ===');
-  console.log(`Base RPC:           ${BASE_RPC_URL}`);
+  console.log(`Chain:              ${chainLabel} (id ${chain.id})`);
+  console.log(`RPC:                ${rpcUrl}`);
   console.log(`Compromised EOA:    ${compromised.address}`);
   console.log(`Operator (gas):     ${operator.address}`);
   console.log(`Target delegate:    ${DELEGATE_TARGET}`);
@@ -118,9 +114,9 @@ async function main(): Promise<void> {
   console.log('--- Pre-flight ---');
   console.log(`EOA current code:   ${describeCode((eoaCodeBefore || '0x') as Hex)}`);
   console.log(`EOA pending nonce:  ${eoaNonce}`);
-  console.log(`Operator balance:   ${formatEther(operatorBalance)} ETH`);
+  console.log(`Operator balance:   ${formatEther(operatorBalance)} ${nativeSymbol}`);
   if (operatorBalance === 0n) {
-    throw new Error('Operator wallet has zero ETH on Base. Top it up before running.');
+    throw new Error(`Operator wallet has zero ${nativeSymbol} on ${chainLabel}. Top it up before running.`);
   }
 
   if (DELEGATE_TARGET.toLowerCase() === ('0x' + '00'.repeat(20)).toLowerCase()) {
@@ -138,7 +134,7 @@ async function main(): Promise<void> {
   console.log('--- Signing EIP-7702 authorization ---');
   const authorization = await compromisedClient.signAuthorization({
     contractAddress: DELEGATE_TARGET,
-    chainId: base.id,
+    chainId: chain.id,
     nonce: eoaNonce,
   });
   console.log(`Authorization OK    (chainId=${authorization.chainId}, nonce=${authorization.nonce}, contract=${shorten(DELEGATE_TARGET)})`);
@@ -159,7 +155,7 @@ async function main(): Promise<void> {
     value: 0n,
   });
   console.log(`Tx hash:            ${txHash}`);
-  console.log(`Watch on Basescan:  https://basescan.org/tx/${txHash}`);
+  console.log(`Watch on explorer:  ${explorerTxBase}${txHash}`);
   console.log('');
 
   console.log('--- Waiting for receipt ---');

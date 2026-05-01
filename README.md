@@ -1,10 +1,14 @@
 # delegator
 
-Sponsored EIP-7702 **delegate-only** tool for Base.
+Sponsored EIP-7702 **delegate-only** tool for any EIP-7702-enabled chain.
 
 Submits a single type-0x04 (SetCode) transaction that re-points a
 compromised EOA's EIP-7702 delegation to a target you control. No claim,
 no sweep, no token movement — just delegation rotation.
+
+**Supported chains** (preset by name): `base`, `ethereum`, `arbitrum`,
+`optimism`, `polygon`, `bsc`, `ink`, `sepolia`, `base-sepolia`. Any
+other EIP-7702-enabled chain works via `CHAIN_ID` + `RPC_URL`.
 
 This is the same mechanic that drainer bots use to keep a compromised
 wallet pointed at their sweeper. Anyone who holds the compromised
@@ -73,26 +77,55 @@ src/
 pnpm install
 cp .env.example .env
 chmod 600 .env
-# fill in COMPROMISED_PK, OPERATOR_PK, DELEGATE_TARGET
+# fill in CHAIN, COMPROMISED_PK, OPERATOR_PK, DELEGATE_TARGET
 ```
+
+## Choosing a chain
+
+Set `CHAIN=` in `.env` (or as an inline env var) to the preset name:
+
+```bash
+CHAIN=base       # default
+CHAIN=ethereum
+CHAIN=arbitrum
+CHAIN=optimism
+CHAIN=polygon
+CHAIN=bsc
+CHAIN=ink
+CHAIN=sepolia        # testnet
+CHAIN=base-sepolia   # testnet
+```
+
+For any chain not in the preset list, set `CHAIN_ID` and `RPC_URL`:
+
+```bash
+CHAIN_ID=999 RPC_URL=https://my-custom-rpc pnpm tsx src/inspect.ts
+```
+
+The operator wallet must hold a few cents of native gas on the chosen
+chain. The compromised wallet never needs gas — the operator pays it.
 
 ## Inspect
 
 ```bash
 ADDRESS=0xC272F976E3343f8b75d111321795cFE7812Dd37E pnpm tsx src/inspect.ts
+# or for another chain:
+CHAIN=ethereum ADDRESS=0xabc... pnpm tsx src/inspect.ts
 ```
 
 Sample output:
 
 ```
 === EOA inspection (Base) ===
+Chain id:       8453
+RPC:            https://mainnet.base.org
 Address:        0xC272F976E3343f8b75d111321795cFE7812Dd37E
 Balance:        0 ETH
 Pending nonce:  3487
 Code:           EIP-7702 delegation
   Delegate:     0x4D78c499683c71d6650b67b9ab0f4f944A738F9e
   Delegate code: 1846 bytes
-  Basescan:     https://basescan.org/address/0x4D78c499683c71d6650b67b9ab0f4f944A738F9e
+  Explorer:     https://basescan.org/address/0x4D78c499683c71d6650b67b9ab0f4f944A738F9e
 ```
 
 ## Run
@@ -127,7 +160,8 @@ Reproduce against your own fork before touching mainnet:
 
 ```bash
 anvil --fork-url https://mainnet.base.org --chain-id 8453 --hardfork prague --port 18546 &
-BASE_RPC_URL=http://127.0.0.1:18546 \
+CHAIN=base \
+RPC_URL=http://127.0.0.1:18546 \
 COMPROMISED_PK=0x... \
 OPERATOR_PK=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 DELEGATE_TARGET=0x0000000000000000000000000000000000000000 \
@@ -136,11 +170,23 @@ pnpm tsx src/delegate.ts
 
 (`0xac09…ff80` is Anvil's well-known dev key #0 — never use it on mainnet.)
 
+For non-Base chains, swap the fork URL and `CHAIN=`. Example for Ink:
+
+```bash
+anvil --fork-url https://rpc-gel.inkonchain.com --chain-id 57073 --hardfork prague --port 18546 &
+CHAIN=ink RPC_URL=http://127.0.0.1:18546 ... pnpm tsx src/delegate.ts
+```
+
 ## Operational notes
 
-- **Operator wallet** must be a fresh, clean Base address with a small
-  amount of ETH for gas. It never holds the compromised key and never
-  receives any value from this flow.
+- **Operator wallet** must be a fresh, clean address on the selected
+  chain with a small amount of native gas. It never holds the
+  compromised key and never receives any value from this flow.
+- **EIP-7702 availability**: the SetCode tx type is only valid on chains
+  that have activated Pectra (Ethereum) or the equivalent OP Stack
+  Isthmus / chain-specific upgrade. All preset chains in this repo are
+  expected to support it as of late 2025; if a chain has not yet
+  activated 7702, the RPC will reject the transaction.
 - **Compromised PK** is read from `COMPROMISED_PK` env var only. Do not
   paste it into chat, code, commits, or any logging system. The PK
   must remain available to the script for as long as you want to keep
