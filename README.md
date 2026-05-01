@@ -7,8 +7,8 @@ compromised EOA's EIP-7702 delegation to a target you control. No claim,
 no sweep, no token movement — just delegation rotation.
 
 **Supported chains** (preset by name): `base`, `ethereum`, `arbitrum`,
-`optimism`, `polygon`, `bsc`, `ink`, `sepolia`, `base-sepolia`. Any
-other EIP-7702-enabled chain works via `CHAIN_ID` + `RPC_URL`.
+`optimism`, `bsc`, `ink`, `sepolia`, `base-sepolia`. Any other
+EIP-7702-enabled chain works via `CHAIN_ID` + `RPC_URL`.
 
 This is the same mechanic that drainer bots use to keep a compromised
 wallet pointed at their sweeper. Anyone who holds the compromised
@@ -97,11 +97,10 @@ Pick a chain (Enter for default = base):
    2. ethereum
    3. arbitrum
    4. optimism
-   5. polygon
-   6. bsc
-   7. ink
-   8. sepolia
-   9. base-sepolia
+   5. bsc
+   6. ink
+   7. sepolia
+   8. base-sepolia
 Chain [1]:
 ```
 
@@ -117,7 +116,7 @@ CHAIN=ink pnpm tsx src/inspect.ts
 ```
 
 Available preset names: `base`, `ethereum`, `arbitrum`, `optimism`,
-`polygon`, `bsc`, `ink`, `sepolia`, `base-sepolia`.
+`bsc`, `ink`, `sepolia`, `base-sepolia`.
 
 For any chain not in the preset list, set `CHAIN_ID` and `RPC_URL`:
 
