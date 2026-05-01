@@ -48,41 +48,7 @@ import {
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { resolveChainProfile } from './chains.js';
-
-const chainProfile = resolveChainProfile();
-const { chain, rpcUrl, explorerTxBase, label: chainLabel } = chainProfile;
-const nativeSymbol = chain.nativeCurrency?.symbol || 'ETH';
-const COMPROMISED_PK = (process.env.COMPROMISED_PK || '') as Hex;
-const OPERATOR_PK = (process.env.OPERATOR_PK || '') as Hex;
-const DELEGATE_TARGET = (process.env.DELEGATE_TARGET || '') as Address;
-
-if (!COMPROMISED_PK.startsWith('0x') || COMPROMISED_PK.length !== 66) {
-  throw new Error('Set COMPROMISED_PK to the leaked wallet private key (0x + 64 hex chars).');
-}
-if (!OPERATOR_PK.startsWith('0x') || OPERATOR_PK.length !== 66) {
-  throw new Error('Set OPERATOR_PK to a clean operator wallet private key (0x + 64 hex chars).');
-}
-if (!DELEGATE_TARGET.startsWith('0x') || DELEGATE_TARGET.length !== 42) {
-  throw new Error('Set DELEGATE_TARGET to the address you want the EOA delegated to (0x + 40 hex chars). Use 0x0000...0000 to clear.');
-}
-
-const compromised = privateKeyToAccount(COMPROMISED_PK);
-const operator = privateKeyToAccount(OPERATOR_PK);
-
-const publicClient = createPublicClient({
-  chain,
-  transport: http(rpcUrl),
-});
-const operatorClient = createWalletClient({
-  account: operator,
-  chain,
-  transport: http(rpcUrl),
-});
-const compromisedClient = createWalletClient({
-  account: compromised,
-  chain,
-  transport: http(rpcUrl),
-});
+import { promptForChainIfNeeded } from './prompt.js';
 
 function shorten(addr: string): string {
   return `${addr.slice(0, 8)}…${addr.slice(-6)}`;
@@ -97,6 +63,32 @@ function describeCode(code: Hex): string {
 }
 
 async function main(): Promise<void> {
+  await promptForChainIfNeeded();
+
+  const { chain, rpcUrl, explorerTxBase, label: chainLabel } = resolveChainProfile();
+  const nativeSymbol = chain.nativeCurrency?.symbol || 'ETH';
+
+  const COMPROMISED_PK = (process.env.COMPROMISED_PK || '') as Hex;
+  const OPERATOR_PK = (process.env.OPERATOR_PK || '') as Hex;
+  const DELEGATE_TARGET = (process.env.DELEGATE_TARGET || '') as Address;
+
+  if (!COMPROMISED_PK.startsWith('0x') || COMPROMISED_PK.length !== 66) {
+    throw new Error('Set COMPROMISED_PK to the leaked wallet private key (0x + 64 hex chars).');
+  }
+  if (!OPERATOR_PK.startsWith('0x') || OPERATOR_PK.length !== 66) {
+    throw new Error('Set OPERATOR_PK to a clean operator wallet private key (0x + 64 hex chars).');
+  }
+  if (!DELEGATE_TARGET.startsWith('0x') || DELEGATE_TARGET.length !== 42) {
+    throw new Error('Set DELEGATE_TARGET to the address you want the EOA delegated to (0x + 40 hex chars). Use 0x0000...0000 to clear.');
+  }
+
+  const compromised = privateKeyToAccount(COMPROMISED_PK);
+  const operator = privateKeyToAccount(OPERATOR_PK);
+
+  const publicClient = createPublicClient({ chain, transport: http(rpcUrl) });
+  const operatorClient = createWalletClient({ account: operator, chain, transport: http(rpcUrl) });
+  const compromisedClient = createWalletClient({ account: compromised, chain, transport: http(rpcUrl) });
+
   console.log('=== EIP-7702 delegate-only runner ===');
   console.log(`Chain:              ${chainLabel} (id ${chain.id})`);
   console.log(`RPC:                ${rpcUrl}`);
