@@ -19,21 +19,20 @@
 import 'dotenv/config';
 import { createPublicClient, http, formatEther, type Hex } from 'viem';
 import { resolveChainProfile } from './chains.js';
-
-const { chain, rpcUrl, explorerAddressBase, label: chainLabel } = resolveChainProfile();
-const nativeSymbol = chain.nativeCurrency?.symbol || 'ETH';
-const TARGET = process.env.ADDRESS || process.env.COMPROMISED_EOA;
-
-if (!TARGET || !TARGET.startsWith('0x') || TARGET.length !== 42) {
-  throw new Error('Set ADDRESS (or COMPROMISED_EOA) to the wallet you want to inspect (0x + 40 hex chars).');
-}
-
-const publicClient = createPublicClient({
-  chain,
-  transport: http(rpcUrl),
-});
+import { promptForChainIfNeeded } from './prompt.js';
 
 async function main(): Promise<void> {
+  await promptForChainIfNeeded();
+
+  const { chain, rpcUrl, explorerAddressBase, label: chainLabel } = resolveChainProfile();
+  const nativeSymbol = chain.nativeCurrency?.symbol || 'ETH';
+  const TARGET = process.env.ADDRESS || process.env.COMPROMISED_EOA;
+
+  if (!TARGET || !TARGET.startsWith('0x') || TARGET.length !== 42) {
+    throw new Error('Set ADDRESS (or COMPROMISED_EOA) to the wallet you want to inspect (0x + 40 hex chars).');
+  }
+
+  const publicClient = createPublicClient({ chain, transport: http(rpcUrl) });
   const address = TARGET as `0x${string}`;
   const [code, balance, nonce] = await Promise.all([
     publicClient.getCode({ address }),

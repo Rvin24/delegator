@@ -82,19 +82,42 @@ chmod 600 .env
 
 ## Choosing a chain
 
-Set `CHAIN=` in `.env` (or as an inline env var) to the preset name:
+There are two ways to pick a chain:
+
+### 1. Interactive picker (default)
+
+Just run the script. If `CHAIN` and `CHAIN_ID` are both unset and you
+are in a terminal, the script prints a numbered list and waits for you
+to type a number (or chain name), then Enter:
+
+```
+$ pnpm tsx src/inspect.ts
+Pick a chain (Enter for default = base):
+   1. base (default)
+   2. ethereum
+   3. arbitrum
+   4. optimism
+   5. polygon
+   6. bsc
+   7. ink
+   8. sepolia
+   9. base-sepolia
+Chain [1]:
+```
+
+Press Enter to accept the default (`base`), or type a number / name.
+
+### 2. Set `CHAIN=` explicitly
+
+To skip the prompt (e.g. in scripts, cron jobs, or when you always use
+the same chain), set `CHAIN=` in `.env` or inline:
 
 ```bash
-CHAIN=base       # default
-CHAIN=ethereum
-CHAIN=arbitrum
-CHAIN=optimism
-CHAIN=polygon
-CHAIN=bsc
-CHAIN=ink
-CHAIN=sepolia        # testnet
-CHAIN=base-sepolia   # testnet
+CHAIN=ink pnpm tsx src/inspect.ts
 ```
+
+Available preset names: `base`, `ethereum`, `arbitrum`, `optimism`,
+`polygon`, `bsc`, `ink`, `sepolia`, `base-sepolia`.
 
 For any chain not in the preset list, set `CHAIN_ID` and `RPC_URL`:
 
