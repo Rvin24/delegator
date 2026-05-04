@@ -140,11 +140,45 @@ async function main(): Promise<void> {
      the EOA with empty data after the auth update would revert. The auth
      list is processed before the call, so the EOA's delegation still
      updates regardless of which `to` we use. */
+
+  /* Some chains' eth_estimateGas (notably Arbitrum One) do NOT include the
+     EIP-7702 auth-list intrinsic cost in their simulation, returning an
+     estimate below the actual minimum and getting the tx rejected with
+     `intrinsic gas too low`.
+
+     The EIP-7702 spec requires intrinsic gas of at least:
+       21000 (base) + 12500 (PER_AUTH_BASE_COST) + 25000 (PER_EMPTY_ACCOUNT_COST)
+     per authorization tuple = 58500 per auth + 21000 base.
+
+     We compute that floor explicitly and apply a 25% safety buffer.
+     User pays gas_used (typically ~38-45k), not gas_limit, so a higher
+     ceiling costs nothing extra (only the upfront balance check sees it). */
+  const PER_AUTH_INTRINSIC = 12500n + 25000n;
+  const intrinsicFloor = 21000n + PER_AUTH_INTRINSIC * 1n; // 58500 for 1 auth
+
+  let gasEstimate = 0n;
+  try {
+    gasEstimate = await publicClient.estimateGas({
+      account: operator.address,
+      to: operator.address,
+      data: '0x',
+      value: 0n,
+      authorizationList: [authorization],
+    });
+  } catch {
+    /* Some RPCs reject estimateGas for type-4 entirely; fall back to floor. */
+  }
+  const baseGas = gasEstimate > intrinsicFloor ? gasEstimate : intrinsicFloor;
+  const gasLimit = (baseGas * 125n) / 100n;
+  console.log(`Gas estimate:       ${gasEstimate || '(unsupported by RPC)'}`);
+  console.log(`Gas limit applied:  ${gasLimit}`);
+
   const txHash = await operatorClient.sendTransaction({
     authorizationList: [authorization],
     to: operator.address,
     data: '0x',
     value: 0n,
+    gas: gasLimit,
   });
   console.log(`Tx hash:            ${txHash}`);
   console.log(`Watch on explorer:  ${explorerTxBase}${txHash}`);
